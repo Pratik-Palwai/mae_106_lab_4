@@ -1,18 +1,18 @@
 #include <Arduino.h>
 
-// put function declarations here:
-int myFunction(int, int);
+#include "drv8833.hpp"
+
+DRV8833 motor_driver(3, 4, 9, 10);
 
 void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+    Serial.begin(115200);
+    motor_driver.begin();
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-}
+    motor_driver.write(-1.0);
+    delay(1000);
 
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+    motor_driver.write(1.0);
+    delay(1000);
 }
