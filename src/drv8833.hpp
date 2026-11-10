@@ -8,21 +8,18 @@ class DRV8833 {
     int in_1_pin = 0;
     int in_2_pin = 0;
     int sleep_pin = 0;
-    int fault_pin = 0;
 
 public:
-    DRV8833(int _in_1_pin, int _in_2_pin, int _sleep_pin, int _fault_pin) {
+    DRV8833(int _in_1_pin, int _in_2_pin, int _sleep_pin) {
         in_1_pin = _in_1_pin;
         in_2_pin = _in_2_pin;
         sleep_pin = _sleep_pin;
-        fault_pin = _fault_pin;
     }
 
     void begin() {
         pinMode(in_1_pin, OUTPUT);
         pinMode(in_2_pin, OUTPUT);
         pinMode(sleep_pin, OUTPUT);
-        pinMode(fault_pin, INPUT_PULLUP);
 
         analogWriteFrequency(20000);
         analogWriteResolution(8);
@@ -55,7 +52,6 @@ public:
         analogWrite(in_2_pin, 255);
     }
 
-    bool isFaulted() { return (digitalRead(fault_pin) == LOW); }
 };
 
 #endif

@@ -2,7 +2,7 @@
 
 #include "drv8833.hpp"
 
-DRV8833 motor_driver(3, 4, 9, 10);
+DRV8833 motor_driver(3, 4, 21); // IN_3_PIN, IN_4_PIN, SLEEP_PIN
 
 void setup() {
     Serial.begin(115200);
