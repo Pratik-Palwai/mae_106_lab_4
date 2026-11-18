@@ -1,18 +1,14 @@
 #include <Arduino.h>
 
-#include "drv8833.hpp"
-
-DRV8833 motor_driver(3, 4, 21); // IN_3_PIN, IN_4_PIN, SLEEP_PIN
+#include "motor_control.hpp"
+#include "serial_output.hpp"
 
 void setup() {
     Serial.begin(115200);
-    motor_driver.begin();
+    delay(200);
+
+    xTaskCreate(motorController, "VELOCITY", 4096, NULL, 2, NULL);
+    xTaskCreate(serialOutput, "SERIAL", 4096, NULL, 1, NULL);
 }
 
-void loop() {
-    motor_driver.write(-1.0);
-    delay(1000);
-
-    motor_driver.write(1.0);
-    delay(1000);
-}
+void loop() { }
