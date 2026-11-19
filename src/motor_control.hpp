@@ -32,9 +32,11 @@ void motorController(void *param) {
             target_velocity = DESIRED_VELOCITY * sinf(omega);
         }
 
+        encoder_main.update();
         pid_input = encoder_main.getVelocity();
+        velocity_correction.Compute();
 
-        motor_main.write(target_velocity / DESIRED_VELOCITY);
+        motor_main.write(pid_output);
 
         vTaskDelay(pdMS_TO_TICKS(2));
     }

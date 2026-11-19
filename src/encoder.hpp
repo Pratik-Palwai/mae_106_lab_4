@@ -5,51 +5,30 @@
 
 class MotorEncoder {
     const float CLICKS_PER_REVOLUTION = 464.1;
-    const unsigned long VELOCITY_TIMEOUT = 20000; // us without a tick before velocity reads as zero
+    const unsigned long VELOCITY_WINDOW = 10000; // us between velocity samples
 
     int A_PIN = 0;
     int B_PIN = 0;
     volatile long raw_position = 0;
-    volatile unsigned long tick_period = 0; // us between the last two ticks, 0 if unknown
-    volatile int tick_direction = 0;
-    volatile unsigned long previous_time = 0;
+    volatile float raw_velocity = 0.0f;
+    volatile uint8_t previous_state = 0; // last (A << 1) | B reading
+    long previous_position = 0;
+    unsigned long previous_time = 0;
 
-    void encoderAChange() {
-        if (digitalRead(A_PIN) == digitalRead(B_PIN)) { 
-            raw_position++; 
-            updateVelocity(1);
-        }
-        else { 
-            raw_position--; 
-            updateVelocity(-1);
-        }
-    }
-    
-    void encoderBChange() {
-        if (digitalRead(A_PIN) == digitalRead(B_PIN)) { 
-            raw_position--; 
-            updateVelocity(-1);
-        }
-        else { 
-            raw_position++; 
-            updateVelocity(1);
-        }
+    void encoderChange() {
+        static const int8_t TRANSITIONS[16] = {
+             0, +1, -1,  0,
+            -1,  0,  0, +1,
+            +1,  0,  0, -1,
+             0, -1, +1,  0
+        };
+
+        uint8_t state = (digitalRead(A_PIN) << 1) | digitalRead(B_PIN);
+        raw_position += TRANSITIONS[(previous_state << 2) | state];
+        previous_state = state;
     }
 
-    // Called from the ISRs: only record timing, velocity is computed in getVelocity()
-    void updateVelocity(int direction) {
-        unsigned long now = micros();
-        unsigned long delta_t = now - previous_time;
-
-        if (previous_time == 0 || delta_t > VELOCITY_TIMEOUT || direction != tick_direction) { tick_period = 0; }
-        else { tick_period = delta_t; }
-
-        tick_direction = direction;
-        previous_time = now;
-    }
-
-    static void ARDUINO_ISR_ATTR isrA(void* arg) { static_cast<MotorEncoder*>(arg)->encoderAChange(); }
-    static void ARDUINO_ISR_ATTR isrB(void* arg) { static_cast<MotorEncoder*>(arg)->encoderBChange(); }
+    static void ARDUINO_ISR_ATTR isr(void* arg) { static_cast<MotorEncoder*>(arg)->encoderChange(); }
 
 public:
     MotorEncoder(int _a_pin, int _b_pin) {
@@ -58,27 +37,39 @@ public:
     }
 
     void begin() {
-        pinMode(A_PIN, INPUT);
-        pinMode(B_PIN, INPUT);
+        pinMode(A_PIN, INPUT_PULLUP);
+        pinMode(B_PIN, INPUT_PULLUP);
 
-        attachInterruptArg(digitalPinToInterrupt(A_PIN), isrA, this, CHANGE);
-        attachInterruptArg(digitalPinToInterrupt(B_PIN), isrB, this, CHANGE);
+        previous_state = (digitalRead(A_PIN) << 1) | digitalRead(B_PIN);
+
+        attachInterruptArg(digitalPinToInterrupt(A_PIN), isr, this, CHANGE);
+        attachInterruptArg(digitalPinToInterrupt(B_PIN), isr, this, CHANGE);
+
+        previous_position = raw_position;
+        previous_time = micros();
+    }
+
+    // recomputes velocity once per window when it is called
+    void update() {
+        unsigned long now = micros();
+        unsigned long delta_t = now - previous_time;
+        if (delta_t < VELOCITY_WINDOW) { return; }
+
+        long position = raw_position;
+        raw_velocity = ((position - previous_position) / CLICKS_PER_REVOLUTION) / (delta_t / 1000000.0f);
+
+        previous_position = position;
+        previous_time = now;
     }
 
     long getPosition() { return raw_position; }
 
-    // Revolutions per second, signed by direction
-    float getVelocity() {
-        unsigned long period = tick_period;
-        unsigned long last = previous_time;
-        int direction = tick_direction;
+    float getVelocity() { return raw_velocity; }
 
-        if (period == 0 || micros() - last > VELOCITY_TIMEOUT) { return 0.0f; }
-
-        return direction / (CLICKS_PER_REVOLUTION * (period / 1000000.0f));
+    void resetPosition() {
+        raw_position = 0;
+        previous_position = 0;
     }
-
-    void resetPosition() { raw_position = 0; }
 };
 
 #endif
